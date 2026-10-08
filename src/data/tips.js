@@ -1,0 +1,18 @@
+export const TIPS = [
+  'Optø fisk og kød i køleskabet – aldrig på køkkenbordet. Og tilbered det samme dag.',
+  'Rester? Køl dem hurtigt ned i en flad bøtte, og spis dem inden for et døgn – eller frys dem samme aften.',
+  'Hold kaffen som normalt. Koffeinabstinenser giver hovedpine og kan forvirre resultatet.',
+  'Lav selv bouillon på kyllingelår og grøntsager, og frys den i portioner. Bouillonterninger indeholder ofte gærekstrakt.',
+  'Tomat, spinat, avocado og aubergine er de grøntsager med mest histamin. Græskar, gulerod og squash er gode afløsere.',
+  'Parmesan og lagret ost er histaminbomber. Mascarpone, flødeost og frisk mozzarella giver cremethed uden.',
+  'Drik et stort glas vand, før du drikker noget andet om morgenen.',
+  'Frys brød i skiver, og rist det direkte fra fryseren – så er det altid frisk.',
+  'Det er den samlede mængde histamin over dagen, der tæller. Én lille fejl ødelægger ikke forsøget.',
+  'Spis regelmæssigt. Lange pauser og lavt blodsukker er en klassisk hovedpine-trigger.',
+  'Notér din menstruation i dagbogen. Hormoner påvirker både hovedpine og histamin.',
+  'Køb hellere ind 2–3 gange om ugen end én stor tur – friskhed er alt.',
+  'Smag til med friske krydderurter, hvidløg og ingefær i stedet for chili og sojasauce.',
+  'Er du ude at spise: Vælg grillet kød, kartofler og grønt uden sauce.',
+  'Banan, citrus, jordbær, kiwi og ananas er de frugter, der oftest giver problemer. Æble, blåbær og mango er gode valg.',
+  'Udfyld dagbogen hver aften – også på gode dage. Det er netop de gode dage, der viser effekten.',
+];
