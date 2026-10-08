@@ -1,0 +1,32 @@
+# Render Blueprint – opretter web-app + database i ét klik.
+# Render Dashboard -> New -> Blueprint -> vælg dette repo.
+#
+# Databasen bruges KUN til at dele data mellem jeres telefoner. Appen gemmer
+# alt lokalt på hver telefon, så den virker også, hvis databasen er væk.
+#
+# NB: Renders gratis Postgres udløber efter 30 dage (rigeligt til et 14-dages
+# forsøg). Vil I bruge den længere, så brug Neon i stedet – se README.
+
+services:
+  - type: web
+    name: lavhistamin
+    runtime: node
+    plan: free
+    region: frankfurt
+    buildCommand: npm ci && npm run build
+    startCommand: npm start
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_VERSION
+        value: "22"
+      - key: DATABASE_URL
+        fromDatabase:
+          name: lavhistamin-db
+          property: connectionString
+
+databases:
+  - name: lavhistamin-db
+    plan: free
+    region: frankfurt
+    databaseName: lavhistamin
+    user: lavhistamin

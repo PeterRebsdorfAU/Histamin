@@ -1,0 +1,27 @@
+{
+  "name": "histamin-app",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Lavhistamin-forsøg: fødevareliste, madplan, indkøb og symptomdagbog",
+  "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "dev": "node scripts/dev.js",
+    "dev:web": "vite",
+    "dev:server": "node --watch server/index.js",
+    "build": "vite build",
+    "start": "node server/index.js",
+    "icons": "node scripts/make-icons.js",
+    "check": "node scripts/check-data.js"
+  },
+  "dependencies": {
+    "@vitejs/plugin-react": "^4.3.4",
+    "express": "^4.21.2",
+    "pg": "^8.13.1",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "vite": "^6.0.7"
+  }
+}
