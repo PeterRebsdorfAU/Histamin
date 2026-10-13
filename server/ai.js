@@ -72,9 +72,7 @@ ${text}` }] }],
       responseSchema: SCHEMA,
       temperature: 0.2,
       maxOutputTokens: 4096,
-      // Opgaven kræver ingen lang "tænkning" – den gør bare svaret langsomt.
-      // Afviser en model feltet, prøver callWithRetry igen uden.
-      thinkingConfig: { thinkingBudget: 0 },
+      // thinkingConfig sættes pr. model i callWithRetry (se THINKING_VARIANTS)
     },
   };
 
@@ -104,23 +102,37 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const TOTAL_MS = 55000; // samlet ventetid for brugeren
 const ATTEMPT_MS = Number(process.env.GEMINI_ATTEMPT_MS) || 25000; // pr. forsøg – så der er tid til reserve-modellen
 
+// Opgaven kræver ingen lang "tænkning" – den gør bare svaret langsomt. Men modellerne
+// styrer det forskelligt (Gemini 2.5: thinkingBudget, Gemini 3: thinkingLevel), og en
+// forkert indstilling giver en generisk 400-fejl. Vi prøver derfor varianterne i
+// rækkefølge og husker, hvilken der virkede for hver model.
+const THINKING_VARIANTS = [{ thinkingBudget: 0 }, { thinkingLevel: 'minimal' }, { thinkingLevel: 'low' }, null];
+const variantFor = new Map(); // model → indeks i THINKING_VARIANTS
+
+const withThinking = (body, variant) => ({
+  ...body,
+  generationConfig: { ...body.generationConfig, ...(variant ? { thinkingConfig: variant } : {}) },
+});
+
 async function callWithRetry(body) {
   const deadline = Date.now() + TOTAL_MS;
   let lastErr;
-  let current = body;
   for (const model of [MODEL, ...FALLBACKS]) {
     // Hovedmodellen får 3 forsøg, reserver 2
     const attempts = model === MODEL ? 3 : 2;
     for (let i = 0; i < attempts; i++) {
       if (Date.now() > deadline - 3000) break;
+      const v = variantFor.get(model) ?? 0;
       try {
-        return await callGemini(model, current, deadline);
+        const payload = await callGemini(model, withThinking(body, THINKING_VARIANTS[v]), deadline);
+        variantFor.set(model, v);
+        return payload;
       } catch (err) {
         lastErr = err;
-        // Modellen kender ikke "thinkingConfig" → prøv samme model igen uden
-        if (err.status === 400 && /think/i.test(err.message) && current.generationConfig.thinkingConfig) {
-          const { thinkingConfig, ...gc } = current.generationConfig;
-          current = { ...current, generationConfig: gc };
+        // 400 skyldes sandsynligvis thinking-indstillingen → prøv næste variant på samme model
+        if (err.status === 400 && !/api key/i.test(err.message) && v < THINKING_VARIANTS.length - 1) {
+          console.warn(`Gemini (${model}): thinking-variant ${JSON.stringify(THINKING_VARIANTS[v])} afvist – prøver næste`);
+          variantFor.set(model, v + 1);
           i--;
           continue;
         }
