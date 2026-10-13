@@ -61,7 +61,16 @@ const SCHEMA = {
 
 export async function analyzeMeal(text) {
   if (!API_KEY) throw new Error('AI er ikke konfigureret');
+  const key = cacheKey(text);
+  const hit = cache.get(key);
+  if (hit && Date.now() - hit.at < CACHE_MS) return hit.result;
+  const result = await analyzeUncached(text);
+  cache.set(key, { at: Date.now(), result });
+  if (cache.size > 300) cache.delete(cache.keys().next().value);
+  return result;
+}
 
+async function analyzeUncached(text) {
   const body = {
     contents: [{ parts: [{ text: `${PROMPT}
 
@@ -119,6 +128,29 @@ const withThinking = (body, variant) => ({
 // andre forespørgsler afbrydes. Det giver hurtige svar, selv når én model er presset.
 const HEDGE_MS = Number(process.env.GEMINI_HEDGE_MS) || 6000;
 
+// ---------- Kvote (429) ----------
+const blockedUntil = new Map(); // model → tidspunkt hvor kvoten er tilbage
+
+// Google angiver ventetid enten i error.details (RetryInfo "123s") eller i teksten ("retry in 8h54m7s")
+function retryDelayMs(error) {
+  const info = (error.details || []).find((d) => d.retryDelay);
+  if (info) return Math.round(parseFloat(info.retryDelay) * 1000);
+  const m = /retry in\s+(?:(\d+)h)?(?:(\d+)m)?(?:([\d.]+)s)?/i.exec(error.message || '');
+  if (!m || !(m[1] || m[2] || m[3])) return null;
+  return ((Number(m[1]) || 0) * 3600 + (Number(m[2]) || 0) * 60 + (Number(m[3]) || 0)) * 1000;
+}
+
+function quotaText(ms) {
+  if (ms >= 3600_000) return `Dagens gratis AI-kvote hos Google er brugt op – prøv igen om ca. ${Math.round(ms / 3600_000)} timer`;
+  if (ms >= 90_000) return `Google begrænser antallet af AI-tjek lige nu – prøv igen om ca. ${Math.round(ms / 60_000)} minutter`;
+  return 'Google begrænser antallet af AI-tjek lige nu – prøv igen om et øjeblik';
+}
+
+// ---------- Cache: samme tekst giver samme svar (sparer kvote) ----------
+const cache = new Map();
+const CACHE_MS = 24 * 3600_000;
+const cacheKey = (text) => text.toLowerCase().replace(/\s+/g, ' ').trim();
+
 async function callWithRetry(body) {
   const deadline = Date.now() + TOTAL_MS;
   const models = [MODEL, ...FALLBACKS];
@@ -126,7 +158,17 @@ async function callWithRetry(body) {
   let done = false;
 
   const lane = async (model, delay) => {
-    await sleep(delay);
+    // Kvoten er brugt op for denne model → spring den over (uden at bruge et forsøg)
+    const blocked = blockedUntil.get(model);
+    if (blocked && blocked > Date.now()) {
+      const e = new Error(quotaText(blocked - Date.now()));
+      e.status = 429;
+      e.quota = true;
+      throw e;
+    }
+    // Er hovedmodellen blokeret, starter reserven med det samme i stedet for at vente
+    const mainBlocked = (blockedUntil.get(models[0]) || 0) > Date.now();
+    await sleep(mainBlocked ? 0 : delay);
     let lastErr = new Error('Gemini kunne ikke nås');
     for (let attempt = 0; attempt < 4; attempt++) {
       if (done || Date.now() > deadline - 2000) break;
@@ -156,8 +198,14 @@ async function callWithRetry(body) {
     return payload;
   } catch (agg) {
     const errs = agg.errors || [agg];
-    // En "rigtig" fejl (fx forkert nøgle) er mere nyttig end en timeout
-    throw errs.find((e) => e.status && !RETRYABLE.has(e.status)) || errs.find((e) => e.status === 503) || errs[0];
+    // En "rigtig" fejl (fx forkert nøgle) er mest nyttig, derefter kvote, så overbelastning
+    const real = errs.find((e) => e.status && !RETRYABLE.has(e.status));
+    if (real) throw real;
+    const quota = errs.find((e) => e.quota);
+    if (quota && errs.some((e) => !e.quota)) {
+      throw Object.assign(new Error(`${quota.message} (og reservemodellen er overbelastet lige nu)`), { status: 429 });
+    }
+    throw quota || errs.find((e) => e.status === 503) || errs[0];
   } finally {
     done = true;
     stop.abort();
@@ -196,8 +244,20 @@ async function callGemini(model, body, deadline, stopSignal) {
   if (!res.ok) {
     console.warn(`Gemini-kald fejlede (${model}):`, res.status, payload.slice(0, 500));
     // Googles egen fejlbesked (indeholder aldrig nøglen) – gør fejlfinding mulig fra appen
-    let msg = '';
-    try { msg = JSON.parse(payload)?.error?.message || ''; } catch { /* ikke JSON */ }
+    let error = {};
+    try { error = JSON.parse(payload)?.error || {}; } catch { /* ikke JSON */ }
+    const msg = error.message || '';
+
+    if (res.status === 429) {
+      // Kvote brugt op. Husk det til Googles "retry"-tidspunkt, så vi ikke spilder forsøg.
+      const ms = retryDelayMs(error) ?? 60_000;
+      blockedUntil.set(model, Date.now() + ms);
+      const e = new Error(quotaText(ms));
+      e.status = 429;
+      e.quota = true;
+      throw e;
+    }
+
     const e = new Error(`Gemini svarede ${res.status}${msg ? `: ${msg.slice(0, 300).replace(/[.\s]+$/, '')}` : ''}`);
     e.status = res.status;
     throw e;
