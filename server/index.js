@@ -54,7 +54,7 @@ app.post('/api/ai/meal', async (req, res) => {
     res.json(await analyzeMeal(text));
   } catch (err) {
     console.error('AI-fejl:', err.message);
-    res.status(502).json({ error: 'AI-tjekket fejlede – prøv igen' });
+    res.status(502).json({ error: 'AI-tjekket fejlede', detail: err.message });
   }
 });
 

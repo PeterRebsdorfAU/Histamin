@@ -32,24 +32,25 @@ Svar KUN med JSON efter skemaet.
 FØDEVARELISTE:
 ${FOOD_LIST}`;
 
+// Gemini REST forventer typerne med STORE bogstaver (OpenAPI-subset: OBJECT, STRING, ...).
 const SCHEMA = {
-  type: 'object',
+  type: 'OBJECT',
   properties: {
     items: {
-      type: 'array',
+      type: 'ARRAY',
       items: {
-        type: 'object',
+        type: 'OBJECT',
         properties: {
-          name: { type: 'string' },
-          foodId: { type: 'string', nullable: true },
-          rating: { type: 'integer' },
-          reason: { type: 'string' },
+          name: { type: 'STRING' },
+          foodId: { type: 'STRING', nullable: true },
+          rating: { type: 'INTEGER' },
+          reason: { type: 'STRING' },
         },
         required: ['name', 'rating'],
       },
     },
-    summary: { type: 'string' },
-    tips: { type: 'array', items: { type: 'string' } },
+    summary: { type: 'STRING' },
+    tips: { type: 'ARRAY', items: { type: 'STRING' } },
   },
   required: ['items', 'summary'],
 };
@@ -58,25 +59,51 @@ export async function analyzeMeal(text) {
   if (!API_KEY) throw new Error('AI er ikke konfigureret');
 
   const body = {
-    contents: [{ parts: [{ text: `${PROMPT}\n\nDET PERSONEN HAR SPIST:\n${text}` }] }],
+    contents: [{ parts: [{ text: `${PROMPT}
+
+DET PERSONEN HAR SPIST:
+${text}` }] }],
     generationConfig: { responseMimeType: 'application/json', responseSchema: SCHEMA, temperature: 0.2 },
   };
 
-  const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent`, {
-    method: 'POST',
-    // Nøglen sendes som header (ikke i URL'en, så den ikke havner i logs).
-    headers: { 'Content-Type': 'application/json', 'x-goog-api-key': API_KEY },
-    body: JSON.stringify(body),
-    signal: AbortSignal.timeout(45000),
-  });
-  const payload = await res.text();
-  if (!res.ok) {
-    console.warn('Gemini-kald fejlede:', res.status, payload.slice(0, 500));
-    throw new Error(`Gemini svarede ${res.status}`);
+  let res;
+  try {
+    res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(MODEL)}:generateContent`, {
+      method: 'POST',
+      // Nøglen sendes som header (ikke i URL'en, så den ikke havner i logs).
+      headers: { 'Content-Type': 'application/json', 'x-goog-api-key': API_KEY },
+      body: JSON.stringify(body),
+      signal: AbortSignal.timeout(50000),
+    });
+  } catch (err) {
+    throw new Error(err.name === 'TimeoutError' ? 'Gemini svarede ikke inden for 50 sekunder' : `Kunne ikke kontakte Gemini (${err.message})`);
   }
 
-  const json = JSON.parse(payload)?.candidates?.[0]?.content?.parts?.map((p) => p.text || '').join('') || '{}';
-  return sanitize(JSON.parse(json));
+  const payload = await res.text();
+  if (!res.ok) {
+    console.warn('Gemini-kald fejlede:', res.status, payload.slice(0, 1000));
+    // Googles egen fejlbesked (indeholder aldrig nøglen) – gør fejlfinding mulig fra appen
+    let msg = '';
+    try { msg = JSON.parse(payload)?.error?.message || ''; } catch { /* ikke JSON */ }
+    throw new Error(`Gemini svarede ${res.status}${msg ? `: ${msg.slice(0, 300)}` : ''}`);
+  }
+
+  const data = JSON.parse(payload);
+  const cand = data?.candidates?.[0];
+  const textOut = (cand?.content?.parts || []).filter((p) => !p.thought).map((p) => p.text || '').join('').trim();
+  if (!textOut) {
+    console.warn('Tomt Gemini-svar:', payload.slice(0, 1000));
+    const why = cand?.finishReason || data?.promptFeedback?.blockReason || 'ukendt';
+    throw new Error(`Gemini gav et tomt svar (årsag: ${why})`);
+  }
+  // Fjern evt. ```json-indpakning, hvis modellen ignorerer JSON-formatet
+  const cleaned = textOut.replace(/^```(?:json)?s*/i, '').replace(/s*```$/, '');
+  try {
+    return sanitize(JSON.parse(cleaned));
+  } catch {
+    console.warn('Ugyldigt JSON fra Gemini:', cleaned.slice(0, 500));
+    throw new Error('Gemini svarede ikke med gyldigt JSON');
+  }
 }
 
 // Defensiv oprydning: kun kendte id'er, og listens vurdering vinder altid.

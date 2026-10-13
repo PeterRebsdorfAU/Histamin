@@ -31,7 +31,8 @@ export async function analyzeText(text) {
     if (res.ok) return { ...(await res.json()), source: 'ai' };
     if (res.status !== 503) {
       const err = await res.json().catch(() => ({}));
-      return { ...localAnalyze(text), source: 'local', note: err.error || 'AI-tjekket fejlede – viser simpelt opslag i stedet.' };
+      const why = [err.error || 'AI-tjekket fejlede', err.detail].filter(Boolean).join(': ');
+      return { ...localAnalyze(text), source: 'local', note: `${why}. Viser simpelt opslag i stedet.` };
     }
   } catch {
     return { ...localAnalyze(text), source: 'local', note: 'Ingen forbindelse til serveren – viser simpelt opslag i stedet.' };
