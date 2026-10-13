@@ -18,15 +18,15 @@ const FALLBACKS = (process.env.GEMINI_FALLBACK_MODELS ?? 'gemini-flash-lite-late
 export const aiEnabled = () => !!API_KEY;
 
 // Fødevarelisten sendes med, så modellen bruger APPENS vurderinger og id'er.
-const FOOD_LIST = FOODS.map((f) => `${f.id}|${f.name}|${f.r}`).join('\n');
+// Vurderingen sendes ikke med – serveren sætter den alligevel ud fra id'et (kortere prompt = hurtigere svar).
+const FOOD_LIST = FOODS.map((f) => `${f.id}|${f.name}`).join('\n');
 
 const PROMPT = `Du hjælper en person i et 14-dages lavhistamin-kostforsøg (pga. hovedpine).
 Personen skriver, hvad vedkommende har spist og drukket. Din opgave:
 1. Del teksten op i de enkelte fødevarer og drikkevarer. Sammensatte retter (fx lasagne, pizza, sushi, burger)
    skal deles op i de ingredienser der har betydning for histamin (fx lasagne → pasta, hakket oksekød, tomat, lagret ost).
-2. Find for hver det bedst matchende id i FØDEVARELISTEN nedenfor (format: id|navn|vurdering). Brug null hvis intet passer.
-3. Giv vurdering 0–3 efter samme skala som listen: 0 = tåles godt, 1 = små mængder ok, 2 = undgå, 3 = undgå helt.
-   Hvis du har valgt et id, SKAL vurderingen være listens vurdering.
+2. Find for hver det bedst matchende id i FØDEVARELISTEN nedenfor (format: id|navn). Brug null hvis intet passer.
+3. Giv vurdering 0–3: 0 = tåles godt, 1 = små mængder ok, 2 = undgå, 3 = undgå helt.
    Tag højde for friskhed: rester der har stået > 1 døgn, røget, modnet, fermenteret, syltet og færdigmad er værre.
 4. "reason": kort forklaring på dansk (max 12 ord), fx "Lagret ost – meget histamin".
 5. "summary": 1–2 venlige sætninger på dansk om dagens samlede histamin-belastning.
@@ -99,8 +99,8 @@ ${text}` }] }],
 const RETRYABLE = new Set([429, 500, 502, 503, 504]);
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
-const TOTAL_MS = 55000; // samlet ventetid for brugeren
-const ATTEMPT_MS = Number(process.env.GEMINI_ATTEMPT_MS) || 25000; // pr. forsøg – så der er tid til reserve-modellen
+const TOTAL_MS = 60000; // samlet ventetid for brugeren
+const ATTEMPT_MS = Number(process.env.GEMINI_ATTEMPT_MS) || 45000; // max pr. forsøg
 
 // Opgaven kræver ingen lang "tænkning" – den gør bare svaret langsomt. Men modellerne
 // styrer det forskelligt (Gemini 2.5: thinkingBudget, Gemini 3: thinkingLevel), og en
@@ -114,39 +114,57 @@ const withThinking = (body, variant) => ({
   generationConfig: { ...body.generationConfig, ...(variant ? { thinkingConfig: variant } : {}) },
 });
 
+// "Hedging": Hovedmodellen starter med det samme. Har den ikke svaret efter HEDGE_MS,
+// startes næste model ved siden af – og så fremdeles. Første gyldige svar vinder, og de
+// andre forespørgsler afbrydes. Det giver hurtige svar, selv når én model er presset.
+const HEDGE_MS = Number(process.env.GEMINI_HEDGE_MS) || 6000;
+
 async function callWithRetry(body) {
   const deadline = Date.now() + TOTAL_MS;
-  let lastErr;
-  for (const model of [MODEL, ...FALLBACKS]) {
-    // Hovedmodellen får 3 forsøg, reserver 2
-    const attempts = model === MODEL ? 3 : 2;
-    for (let i = 0; i < attempts; i++) {
-      if (Date.now() > deadline - 3000) break;
+  const models = [MODEL, ...FALLBACKS];
+  const stop = new AbortController();
+  let done = false;
+
+  const lane = async (model, delay) => {
+    await sleep(delay);
+    let lastErr = new Error('Gemini kunne ikke nås');
+    for (let attempt = 0; attempt < 4; attempt++) {
+      if (done || Date.now() > deadline - 2000) break;
       const v = variantFor.get(model) ?? 0;
       try {
-        const payload = await callGemini(model, withThinking(body, THINKING_VARIANTS[v]), deadline);
+        const payload = await callGemini(model, withThinking(body, THINKING_VARIANTS[v]), deadline, stop.signal);
         variantFor.set(model, v);
         return payload;
       } catch (err) {
         lastErr = err;
+        if (done || err.aborted) break;
         // 400 skyldes sandsynligvis thinking-indstillingen → prøv næste variant på samme model
         if (err.status === 400 && !/api key/i.test(err.message) && v < THINKING_VARIANTS.length - 1) {
           console.warn(`Gemini (${model}): thinking-variant ${JSON.stringify(THINKING_VARIANTS[v])} afvist – prøver næste`);
           variantFor.set(model, v + 1);
-          i--;
           continue;
         }
-        if (err.status === 404) break; // modellen findes ikke → næste model
-        if (!RETRYABLE.has(err.status)) throw err; // fx forkert nøgle – nytter ikke at prøve igen
-        if (err.status === 429 || err.timeout) break; // kvote/for langsom → reserve-model med det samme
-        if (i < attempts - 1) await sleep(1200 * (i + 1));
+        if (!RETRYABLE.has(err.status) || err.status === 429 || err.timeout) break;
+        await sleep(1500 * (attempt + 1)); // 503 o.l. → kort pause og prøv igen
       }
     }
+    throw lastErr;
+  };
+
+  try {
+    const payload = await Promise.any(models.map((m, i) => lane(m, i * HEDGE_MS)));
+    return payload;
+  } catch (agg) {
+    const errs = agg.errors || [agg];
+    // En "rigtig" fejl (fx forkert nøgle) er mere nyttig end en timeout
+    throw errs.find((e) => e.status && !RETRYABLE.has(e.status)) || errs.find((e) => e.status === 503) || errs[0];
+  } finally {
+    done = true;
+    stop.abort();
   }
-  throw lastErr || new Error('Gemini kunne ikke nås');
 }
 
-async function callGemini(model, body, deadline) {
+async function callGemini(model, body, deadline, stopSignal) {
   const started = Date.now();
   let res;
   try {
@@ -155,9 +173,17 @@ async function callGemini(model, body, deadline) {
       // Nøglen sendes som header (ikke i URL'en, så den ikke havner i logs).
       headers: { 'Content-Type': 'application/json', 'x-goog-api-key': API_KEY },
       body: JSON.stringify(body),
-      signal: AbortSignal.timeout(Math.max(5000, Math.min(ATTEMPT_MS, deadline - Date.now()))),
+      signal: AbortSignal.any([
+        stopSignal,
+        AbortSignal.timeout(Math.max(3000, Math.min(ATTEMPT_MS, deadline - Date.now()))),
+      ]),
     });
   } catch (err) {
+    if (stopSignal.aborted) {
+      const e = new Error('Afbrudt – en anden model svarede først');
+      e.aborted = true;
+      throw e;
+    }
     const timeout = err.name === 'TimeoutError';
     console.warn(`Gemini (${model}) ${timeout ? 'timeout' : 'netværksfejl'} efter ${Date.now() - started} ms`);
     const e = new Error(timeout ? 'Gemini svarede ikke i tide – prøv igen om lidt' : `Kunne ikke kontakte Gemini (${err.message})`);
