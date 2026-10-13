@@ -10,6 +10,10 @@ import { FOODS, FOOD_BY_ID } from '../src/data/foods.js';
 
 const API_KEY = process.env.GEMINI_API_KEY || process.env.Gemini__ApiKey || '';
 const MODEL = process.env.GEMINI_MODEL || process.env.Gemini__Model || 'gemini-flash-latest';
+// Reserve-modeller, hvis hovedmodellen er overbelastet (503) eller kvoten er brugt (429).
+// Kommasepareret; sæt GEMINI_FALLBACK_MODELS="" for at slå fra.
+const FALLBACKS = (process.env.GEMINI_FALLBACK_MODELS ?? 'gemini-flash-lite-latest')
+  .split(',').map((m) => m.trim()).filter((m) => m && m !== MODEL);
 
 export const aiEnabled = () => !!API_KEY;
 
@@ -66,28 +70,7 @@ ${text}` }] }],
     generationConfig: { responseMimeType: 'application/json', responseSchema: SCHEMA, temperature: 0.2 },
   };
 
-  let res;
-  try {
-    res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(MODEL)}:generateContent`, {
-      method: 'POST',
-      // Nøglen sendes som header (ikke i URL'en, så den ikke havner i logs).
-      headers: { 'Content-Type': 'application/json', 'x-goog-api-key': API_KEY },
-      body: JSON.stringify(body),
-      signal: AbortSignal.timeout(50000),
-    });
-  } catch (err) {
-    throw new Error(err.name === 'TimeoutError' ? 'Gemini svarede ikke inden for 50 sekunder' : `Kunne ikke kontakte Gemini (${err.message})`);
-  }
-
-  const payload = await res.text();
-  if (!res.ok) {
-    console.warn('Gemini-kald fejlede:', res.status, payload.slice(0, 1000));
-    // Googles egen fejlbesked (indeholder aldrig nøglen) – gør fejlfinding mulig fra appen
-    let msg = '';
-    try { msg = JSON.parse(payload)?.error?.message || ''; } catch { /* ikke JSON */ }
-    throw new Error(`Gemini svarede ${res.status}${msg ? `: ${msg.slice(0, 300)}` : ''}`);
-  }
-
+  const payload = await callWithRetry(body);
   const data = JSON.parse(payload);
   const cand = data?.candidates?.[0];
   const textOut = (cand?.content?.parts || []).filter((p) => !p.thought).map((p) => p.text || '').join('').trim();
@@ -97,13 +80,67 @@ ${text}` }] }],
     throw new Error(`Gemini gav et tomt svar (årsag: ${why})`);
   }
   // Fjern evt. ```json-indpakning, hvis modellen ignorerer JSON-formatet
-  const cleaned = textOut.replace(/^```(?:json)?s*/i, '').replace(/s*```$/, '');
+  const cleaned = textOut.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '');
   try {
     return sanitize(JSON.parse(cleaned));
   } catch {
     console.warn('Ugyldigt JSON fra Gemini:', cleaned.slice(0, 500));
     throw new Error('Gemini svarede ikke med gyldigt JSON');
   }
+}
+
+// Gemini er ofte kortvarigt overbelastet. Prøv igen med pause, og skift derefter til en reserve-model.
+const RETRYABLE = new Set([429, 500, 502, 503, 504]);
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+async function callWithRetry(body) {
+  const deadline = Date.now() + 55000;
+  let lastErr;
+  for (const model of [MODEL, ...FALLBACKS]) {
+    // Hovedmodellen får 3 forsøg, reserver 2
+    const attempts = model === MODEL ? 3 : 2;
+    for (let i = 0; i < attempts; i++) {
+      if (Date.now() > deadline - 3000) break;
+      try {
+        return await callGemini(model, body, deadline);
+      } catch (err) {
+        lastErr = err;
+        if (err.status === 404) break; // modellen findes ikke → næste model
+        if (!RETRYABLE.has(err.status)) throw err; // fx forkert nøgle – nytter ikke at prøve igen
+        if (err.status === 429) break; // kvote → prøv reserve-model med det samme
+        if (i < attempts - 1) await sleep(1200 * (i + 1));
+      }
+    }
+  }
+  throw lastErr || new Error('Gemini kunne ikke nås');
+}
+
+async function callGemini(model, body, deadline) {
+  let res;
+  try {
+    res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`, {
+      method: 'POST',
+      // Nøglen sendes som header (ikke i URL'en, så den ikke havner i logs).
+      headers: { 'Content-Type': 'application/json', 'x-goog-api-key': API_KEY },
+      body: JSON.stringify(body),
+      signal: AbortSignal.timeout(Math.max(5000, deadline - Date.now())),
+    });
+  } catch (err) {
+    const e = new Error(err.name === 'TimeoutError' ? 'Gemini svarede ikke i tide' : `Kunne ikke kontakte Gemini (${err.message})`);
+    e.status = 504;
+    throw e;
+  }
+  const payload = await res.text();
+  if (!res.ok) {
+    console.warn(`Gemini-kald fejlede (${model}):`, res.status, payload.slice(0, 500));
+    // Googles egen fejlbesked (indeholder aldrig nøglen) – gør fejlfinding mulig fra appen
+    let msg = '';
+    try { msg = JSON.parse(payload)?.error?.message || ''; } catch { /* ikke JSON */ }
+    const e = new Error(`Gemini svarede ${res.status}${msg ? `: ${msg.slice(0, 300).replace(/[.\s]+$/, '')}` : ''}`);
+    e.status = res.status;
+    throw e;
+  }
+  return payload;
 }
 
 // Defensiv oprydning: kun kendte id'er, og listens vurdering vinder altid.

@@ -110,7 +110,9 @@ Samme opsætning som i IndkøbsApp. Nøglen ligger kun på serveren og sendes al
 
 1. Brug den samme Gemini-nøgle som i IndkøbsApp, eller opret en ny på https://aistudio.google.com/apikey.
 2. På Render: åbn servicen **lavhistamin** → **Environment** → tilføj `GEMINI_API_KEY` = nøglen.
-   Valgfrit: `GEMINI_MODEL` (standard `gemini-flash-latest`).
+   Valgfrit: `GEMINI_MODEL` (standard `gemini-flash-latest`) og `GEMINI_FALLBACK_MODELS`
+   (standard `gemini-flash-lite-latest`). Er hovedmodellen overbelastet, prøver serveren igen
+   og skifter derefter automatisk til reservemodellen.
 3. Gem. Render genstarter servicen, og under *Indstillinger → AI mad-tjek* står der nu "Slået til".
 
 Uden nøgle virker appen stadig, men Mad-tjek laver kun et simpelt opslag i fødevarelisten. Serveren
