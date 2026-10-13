@@ -73,6 +73,7 @@ export default function MealCheck({ date: initialDate }) {
         <button className="btn primary block" disabled={!text.trim() || busy} onClick={run}>
           {busy ? <><span className="spinner sm" /> Tjekker…</> : <><Icon name="bolt" size={18} /> Tjek histamin</>}
         </button>
+        {busy && <p className="muted small center">AI'en vurderer hver ingrediens – det tager typisk 5–20 sekunder.</p>}
         {ai === true && <p className="muted small">Teksten sendes til Google Gemini for at blive vurderet. Skriv ikke personlige oplysninger.</p>}
         {ai === false && <p className="muted small">AI er ikke slået til endnu – appen laver et simpelt opslag i fødevarelisten.</p>}
       </Card>

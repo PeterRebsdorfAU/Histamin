@@ -67,7 +67,15 @@ export async function analyzeMeal(text) {
 
 DET PERSONEN HAR SPIST:
 ${text}` }] }],
-    generationConfig: { responseMimeType: 'application/json', responseSchema: SCHEMA, temperature: 0.2 },
+    generationConfig: {
+      responseMimeType: 'application/json',
+      responseSchema: SCHEMA,
+      temperature: 0.2,
+      maxOutputTokens: 4096,
+      // Opgaven kræver ingen lang "tænkning" – den gør bare svaret langsomt.
+      // Afviser en model feltet, prøver callWithRetry igen uden.
+      thinkingConfig: { thinkingBudget: 0 },
+    },
   };
 
   const payload = await callWithRetry(body);
@@ -93,21 +101,32 @@ ${text}` }] }],
 const RETRYABLE = new Set([429, 500, 502, 503, 504]);
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
+const TOTAL_MS = 55000; // samlet ventetid for brugeren
+const ATTEMPT_MS = Number(process.env.GEMINI_ATTEMPT_MS) || 25000; // pr. forsøg – så der er tid til reserve-modellen
+
 async function callWithRetry(body) {
-  const deadline = Date.now() + 55000;
+  const deadline = Date.now() + TOTAL_MS;
   let lastErr;
+  let current = body;
   for (const model of [MODEL, ...FALLBACKS]) {
     // Hovedmodellen får 3 forsøg, reserver 2
     const attempts = model === MODEL ? 3 : 2;
     for (let i = 0; i < attempts; i++) {
       if (Date.now() > deadline - 3000) break;
       try {
-        return await callGemini(model, body, deadline);
+        return await callGemini(model, current, deadline);
       } catch (err) {
         lastErr = err;
+        // Modellen kender ikke "thinkingConfig" → prøv samme model igen uden
+        if (err.status === 400 && /think/i.test(err.message) && current.generationConfig.thinkingConfig) {
+          const { thinkingConfig, ...gc } = current.generationConfig;
+          current = { ...current, generationConfig: gc };
+          i--;
+          continue;
+        }
         if (err.status === 404) break; // modellen findes ikke → næste model
         if (!RETRYABLE.has(err.status)) throw err; // fx forkert nøgle – nytter ikke at prøve igen
-        if (err.status === 429) break; // kvote → prøv reserve-model med det samme
+        if (err.status === 429 || err.timeout) break; // kvote/for langsom → reserve-model med det samme
         if (i < attempts - 1) await sleep(1200 * (i + 1));
       }
     }
@@ -116,6 +135,7 @@ async function callWithRetry(body) {
 }
 
 async function callGemini(model, body, deadline) {
+  const started = Date.now();
   let res;
   try {
     res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`, {
@@ -123,14 +143,18 @@ async function callGemini(model, body, deadline) {
       // Nøglen sendes som header (ikke i URL'en, så den ikke havner i logs).
       headers: { 'Content-Type': 'application/json', 'x-goog-api-key': API_KEY },
       body: JSON.stringify(body),
-      signal: AbortSignal.timeout(Math.max(5000, deadline - Date.now())),
+      signal: AbortSignal.timeout(Math.max(5000, Math.min(ATTEMPT_MS, deadline - Date.now()))),
     });
   } catch (err) {
-    const e = new Error(err.name === 'TimeoutError' ? 'Gemini svarede ikke i tide' : `Kunne ikke kontakte Gemini (${err.message})`);
+    const timeout = err.name === 'TimeoutError';
+    console.warn(`Gemini (${model}) ${timeout ? 'timeout' : 'netværksfejl'} efter ${Date.now() - started} ms`);
+    const e = new Error(timeout ? 'Gemini svarede ikke i tide – prøv igen om lidt' : `Kunne ikke kontakte Gemini (${err.message})`);
     e.status = 504;
+    e.timeout = timeout;
     throw e;
   }
   const payload = await res.text();
+  console.log(`Gemini (${model}) svarede ${res.status} efter ${Date.now() - started} ms`);
   if (!res.ok) {
     console.warn(`Gemini-kald fejlede (${model}):`, res.status, payload.slice(0, 500));
     // Googles egen fejlbesked (indeholder aldrig nøglen) – gør fejlfinding mulig fra appen
