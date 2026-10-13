@@ -30,7 +30,7 @@ export const GUIDE = [
     list: [
       'Dag 1–4: Kroppen skal "tømme spanden". Mange mærker ikke forskel endnu – hold fast!',
       'Dag 5–14: Her viser det sig typisk, om der er en effekt.',
-      'Udfyld dagbogen hver dag – også på gode dage. Det er sammenligningen, der giver svaret.',
+      'Notér hovedpine hver dag – også "ingen hovedpine" på gode dage. Det er sammenligningen, der giver svaret.',
       'Hold øvrige vaner stabile (søvn, kaffe, træning), så I kan se effekten af maden alene.',
       'Efter forsøget genintroducerer man fødevarer én ad gangen – se "Efter de 14 dage".',
     ],
@@ -99,7 +99,7 @@ export const GUIDE = [
     icon: '🧠',
     title: 'Andre hovedpine-triggere at holde øje med',
     body: [
-      'Hovedpine har mange mulige årsager. Dagbogen registrerer de vigtigste, så I bedre kan se, om det er maden – eller noget andet:',
+      'Hovedpine har mange mulige årsager. Hold øje med disse – og skriv dem gerne i noten på dagen:',
     ],
     list: [
       'Søvn: for lidt (og for meget) søvn',
@@ -121,7 +121,7 @@ export const GUIDE = [
     list: [
       'Spørg lægen eller apoteket, hvis du tager fast medicin, om den kan påvirke histamin.',
       'DAO-tilskud (enzymkapsler til måltidet) og antihistamin findes – men tal med lægen, før I bruger dem. Under selve forsøget giver det klarest svar at lade være, så I ser effekten af kosten alene.',
-      'Notér al smertestillende medicin i dagbogen – det er vigtigt for vurderingen bagefter.',
+      'Notér smertestillende, når du registrerer hovedpine – det er vigtigt for vurderingen bagefter.',
     ],
   },
   {
@@ -134,7 +134,7 @@ export const GUIDE = [
       'Undgå buffeter – maden har ofte stået længe.',
       'Sushi, pizza, burgere med ost/bacon, asiatisk med sojasauce og indisk karry er svære.',
       'Fortæl gerne værterne, at du er i et 14-dages kostforsøg – de fleste synes, det er helt fint.',
-      'Spiser du noget uden for planen, så notér det i dagbogen. Det er ikke "snyd" – det er data!',
+      'Spiser du noget uden for planen, så skriv det i Mad-tjek. Det er ikke "snyd" – det er data!',
     ],
   },
   {
@@ -210,24 +210,4 @@ export const IDEAS = {
   },
 };
 
-// Symptomer i dagbogen
-export const SYMPTOMS = [
-  { id: 'naese', label: 'Tilstoppet/løbende næse', icon: '🤧' },
-  { id: 'roedme', label: 'Rødme / varme i ansigtet', icon: '😳' },
-  { id: 'kloe', label: 'Kløe / udslæt', icon: '🤚' },
-  { id: 'mave', label: 'Mave (oppustet, ondt, diarré)', icon: '😖' },
-  { id: 'kvalme', label: 'Kvalme', icon: '🤢' },
-  { id: 'hjerte', label: 'Hjertebanken / uro', icon: '💓' },
-  { id: 'svimmel', label: 'Svimmelhed', icon: '💫' },
-  { id: 'traet', label: 'Udpræget træthed', icon: '🥱' },
-];
-
 export const HEADACHE_LABELS = ['Ingen', 'Meget let', 'Let', 'Let', 'Moderat', 'Moderat', 'Moderat', 'Kraftig', 'Kraftig', 'Meget kraftig', 'Værst tænkelige'];
-
-// Daglige gode vaner (afkrydsning på "I dag")
-export const DAILY_HABITS = [
-  { id: 'vand', label: 'Drukket 1,5–2 liter vand' },
-  { id: 'friskt', label: 'Kun frisklavet mad / rester under ~1 døgn' },
-  { id: 'maaltider', label: 'Spist regelmæssigt (ingen lange pauser)' },
-  { id: 'ingen-alkohol', label: 'Ingen alkohol' },
-];

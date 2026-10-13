@@ -72,7 +72,7 @@ export default function After({ testFood }) {
       </Card>
 
       <Card title="2b. Ingen tydelig forskel?" icon="🤔">
-        <p>Så er histamin nok ikke hovedårsagen til hovedpinen. Gå til lægen, og medbring rapporten – dagbogen kan stadig vise mønstre (søvn, stress, cyklus, vand, koffein), der kan hjælpe.</p>
+        <p>Så er histamin nok ikke hovedårsagen til hovedpinen. Gå til lægen, og medbring rapporten – den viser hovedpinen dag for dag og hvad der er spist.</p>
         <button className="btn ghost sm" onClick={() => go('/rapport')}><Icon name="print" size={16} /> Rapport til lægen</button>
       </Card>
 
@@ -80,7 +80,7 @@ export default function After({ testFood }) {
         <ol className="numbered">
           <li>Fortsæt med lavhistamin-kosten som grundlag.</li>
           <li>Vælg <b>én</b> fødevare. Spis en normal portion – gerne 1–2 gange samme dag.</li>
-          <li>Vent 2–3 dage, og notér symptomer i dagbogen. Reaktioner kan komme forsinket.</li>
+          <li>Vent 2–3 dage, og notér hovedpine som normalt. Reaktioner kan komme forsinket.</li>
           <li>Ingen reaktion → den må gerne komme tilbage i kosten. Reaktion → vent, til symptomerne er væk, før næste test.</li>
           <li>Test ikke på dage med ekstra stress, sygdom eller menstruation – det giver usikre svar.</li>
           <li>Start med fødevarer markeret gul/"Små mængder", før de røde.</li>

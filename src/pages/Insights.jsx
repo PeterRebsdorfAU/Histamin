@@ -3,7 +3,6 @@ import { go } from '../lib/router.js';
 import { PageHeader, Card, Empty, Dot, headColor } from '../components/ui.jsx';
 import HeadacheChart from '../components/HeadacheChart.jsx';
 import Icon from '../components/Icon.jsx';
-import { fromKey } from '../lib/dates.js';
 
 export default function Insights() {
   const ins = computeInsights();
@@ -14,19 +13,20 @@ export default function Insights() {
       <div className="page">
         <PageHeader title="Fremskridt" backTo="/" />
         <Empty icon="📈" title="Forsøget er ikke startet endnu">
-          <p className="muted small">Når I er i gang og har udfyldt dagbogen et par dage, kommer grafer og mønstre her.</p>
+          <p className="muted small">Når I er i gang og har noteret hovedpine et par dage, kommer grafer og mønstre her.</p>
         </Empty>
       </div>
     );
   }
 
   const scaled = baseline && all.n ? (all.headacheDays / all.n) * 14 : null;
+  const p = ins.patterns.histamine;
 
   return (
     <div className="page">
       <PageHeader
         title="Fremskridt"
-        sub={`${logged.length} af ${Math.min(info.dayNo, info.total)} dage udfyldt`}
+        sub={`Hovedpine noteret ${logged.length} af ${Math.min(info.dayNo, info.total)} dage`}
         backTo="/"
         right={<button className="icon-btn" onClick={() => go('/rapport')} aria-label="Rapport"><Icon name="print" /></button>}
       />
@@ -38,14 +38,13 @@ export default function Insights() {
           <span><i className="lg-dot" style={{ background: headColor(2) }} /> let</span>
           <span><i className="lg-dot" style={{ background: headColor(5) }} /> moderat</span>
           <span><i className="lg-dot" style={{ background: headColor(8) }} /> kraftig</span>
-          <span><i className="lg-dot" style={{ background: 'var(--period)' }} /> menstruation</span>
-          <span><b>!</b> afveg fra kosten</span>
+          <span><b className="mark-legend">!</b> meget histamin i maden</span>
         </div>
       </Card>
 
       {logged.length < 3 ? (
         <Empty icon="⏳" title="Lidt flere dage, så kommer tallene">
-          <p className="muted small">Udfyld dagbogen mindst 3 dage for at se statistik.</p>
+          <p className="muted small">Notér hovedpine (eller "ingen hovedpine") mindst 3 dage for at se statistik.</p>
         </Empty>
       ) : (
         <>
@@ -65,77 +64,63 @@ export default function Insights() {
               <span className="kpi-label">smertestillende i alt</span>
             </div>
             <div className="kpi">
-              <span className="kpi-val">{ins.adherence == null ? '–' : pct(ins.adherence)}</span>
-              <span className="kpi-label">dage helt på kosten</span>
+              <span className="kpi-val">{ins.lowFoodShare == null ? '–' : pct(ins.lowFoodShare)}</span>
+              <span className="kpi-label">dage med lavt histamin i maden</span>
+              {ins.foodDays > 0 && <span className="kpi-cmp">ud af {ins.foodDays} tjekkede dage</span>}
             </div>
           </div>
 
           {baseline && scaled != null && <Verdict baselineDays={baseline.days} scaled={scaled} n={all.n} />}
 
-          <Card title="Første halvdel vs. anden halvdel" icon="⚖️">
+          <Card title="Første vs. anden halvdel" icon="⚖️">
             <p className="muted small">Effekten af kosten kommer typisk efter nogle dage – derfor er anden halvdel mest interessant.</p>
             <table className="cmp-table">
               <thead>
                 <tr><th /><th>Dag 1–{ins.half}</th><th>Dag {ins.half + 1}–{info.total}</th></tr>
               </thead>
               <tbody>
-                <tr><td>Udfyldte dage</td><td>{first.n}</td><td>{second.n}</td></tr>
+                <tr><td>Noterede dage</td><td>{first.n}</td><td>{second.n}</td></tr>
                 <tr><td>Dage med hovedpine</td><td>{first.headacheDays}</td><td>{second.headacheDays}</td></tr>
                 <tr><td>Andel</td><td>{first.n ? pct(first.headacheDays / first.n) : '–'}</td><td>{second.n ? pct(second.headacheDays / second.n) : '–'}</td></tr>
                 <tr><td>Gns. styrke</td><td>{one(first.avgIntensity)}</td><td>{one(second.avgIntensity)}</td></tr>
                 <tr><td>Smertestillende</td><td>{first.meds}</td><td>{second.meds}</td></tr>
-                <tr><td>Velbefindende (1–5)</td><td>{one(first.wellbeing)}</td><td>{one(second.wellbeing)}</td></tr>
               </tbody>
             </table>
           </Card>
 
-          <Card title="Andre symptomer" icon="🩺">
-            <div className="sym-grid" style={{ '--n': ins.days.length }}>
-              {ins.symptomCounts.map((s) => (
-                <div key={s.id} className="sym-row">
-                  <span className="sym-name" title={s.label}>{s.icon} <span>{s.label}</span></span>
-                  <span className="sym-cells">
-                    {s.byDay.map((v, i) => <i key={i} className={`sym-cell sv${v}`} title={`${ins.days[i].date}: ${v}`} />)}
-                  </span>
-                  <span className="sym-count">{s.days}</span>
-                </div>
-              ))}
-              <div className="sym-row axis">
-                <span className="sym-name" />
-                <span className="sym-cells">{ins.days.map((d) => <i key={d.date} className="sym-cell axis">{fromKey(d.date).getDate()}</i>)}</span>
-                <span className="sym-count" />
-              </div>
-            </div>
-          </Card>
-
-          <Card title="Mønstre at holde øje med" icon="🔎">
-            <p className="muted small">
-              Sammenligner hovedpine på dage med og uden en bestemt faktor. Med så få dage er det kun pejlemærker – ikke beviser.
-            </p>
-            {ins.patterns.factors.length === 0 && <p className="muted">Ikke nok variation i data endnu.</p>}
-            {ins.patterns.factors.map((p) => (
-              <div key={p.label} className="pattern">
-                <div className="pattern-head">
-                  <b>{p.label}</b>
-                  {p.diff >= 0.25 && p.withN >= 2 && <span className="mini-badge st-reaction">Mulig sammenhæng</span>}
-                </div>
-                <div className="pattern-bars">
-                  <Bar label={`Med (${p.withN} d.)`} v={p.withRate} strong />
-                  <Bar label={`Uden (${p.withoutN} d.)`} v={p.withoutRate} />
-                </div>
-                {p.hint && <span className="muted small">{p.hint}</span>}
-              </div>
-            ))}
-            {ins.patterns.foods.length > 0 && (
+          <Card title="Maden og hovedpinen" icon="🔎">
+            {!p && ins.patterns.foods.length === 0 ? (
+              <p className="muted small">
+                Brug <button className="link-btn" onClick={() => go('/spist')}>Mad-tjek</button> et par dage – så kan appen
+                sammenligne hovedpine efter dage med lavt og højt histamin.
+              </p>
+            ) : (
               <>
-                <h3 className="sub-title">Fødevarer spist uden for planen</h3>
-                <ul className="plain-list">
-                  {ins.patterns.foods.map((f) => (
-                    <li key={f.foodId}>
-                      <Dot r={f.food.r} /> <b>{f.food.name}</b> – {f.times} gang{f.times > 1 ? 'e' : ''}, hovedpine samme/næste dag {f.followed} gang{f.followed !== 1 ? 'e' : ''}
-                    </li>
-                  ))}
-                </ul>
+                <p className="muted small">Hovedpine samme dag eller dagen efter. Med så få dage er det pejlemærker – ikke beviser.</p>
+                {p && (
+                  <div className="pattern">
+                    <div className="pattern-head">
+                      <b>Dage med middel/højt histamin</b>
+                      {p.withRate - p.withoutRate >= 0.25 && p.withN >= 2 && <span className="mini-badge st-reaction">Mulig sammenhæng</span>}
+                    </div>
+                    <div className="pattern-bars">
+                      <Bar label={`Højt (${p.withN} d.)`} v={p.withRate} strong />
+                      <Bar label={`Lavt (${p.withoutN} d.)`} v={p.withoutRate} />
+                    </div>
+                  </div>
+                )}
+                {ins.patterns.foods.length > 0 && (
+                  <>
+                    <h3 className="sub-title">Problematiske fødevarer I har spist</h3>
+                    <ul className="plain-list">
+                      {ins.patterns.foods.map((f) => (
+                        <li key={f.foodId}>
+                          <Dot r={f.food.r} /> <b>{f.food.name}</b> – {f.times} gang{f.times > 1 ? 'e' : ''}, fulgt af hovedpine {f.followed} gang{f.followed !== 1 ? 'e' : ''}
+                        </li>
+                      ))}
+                    </ul>
+                  </>
+                )}
               </>
             )}
           </Card>
@@ -189,7 +174,7 @@ function Verdict({ baselineDays, scaled, n }) {
   return (
     <div className="notice">
       <Icon name="info" size={18} />
-      <span>Indtil videre ingen tydelig forskel i antal hovedpinedage. Se også styrke, andre symptomer og mønstrene nedenfor.</span>
+      <span>Indtil videre ingen tydelig forskel i antal hovedpinedage. Se også styrken og anden halvdel.</span>
     </div>
   );
 }

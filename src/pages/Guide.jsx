@@ -1,19 +1,9 @@
 import { GUIDE, IDEAS } from '../data/guide.js';
 import { FOOD_BY_ID } from '../data/foods.js';
-import { put, newId, all } from '../lib/db.js';
-import { PageHeader, Card, Dot, useToast } from '../components/ui.jsx';
+import { PageHeader, Card, Dot } from '../components/ui.jsx';
 import Icon from '../components/Icon.jsx';
 
 export default function Guide({ open }) {
-  const [toast, showToast] = useToast();
-
-  const addToShop = (idea) => {
-    const existing = new Set(all('shopManual').filter((m) => !m.checked).map((m) => m.foodId));
-    const add = idea.foods.filter((f) => !existing.has(f));
-    add.forEach((f, i) => put('shopManual', newId() + i, { name: FOOD_BY_ID[f].name, foodId: f, checked: false, createdAt: Date.now() + i }));
-    showToast(add.length ? `${add.length} varer lagt på indkøbslisten` : 'Varerne er allerede på listen');
-  };
-
   return (
     <div className="page">
       <PageHeader title="Viden & idéer" sub="Det vigtigste om histamin – og hvad man kan spise" backTo="/" />
@@ -34,7 +24,7 @@ export default function Guide({ open }) {
       ))}
 
       <h2 className="section-title">Idéer til resten af dagen</h2>
-      <p className="muted small">Aftensmaden står i madplanen. Her er forslag til morgenmad, frokost og mellemmåltider – tryk + for at lægge ingredienserne på indkøbslisten.</p>
+      <p className="muted small">Aftensmaden står i madplanen. Her er forslag til morgenmad, frokost og mellemmåltider. Prikkerne viser ingrediensernes histamin-vurdering.</p>
       {Object.entries(IDEAS).map(([id, sec]) => (
         <Card key={id} title={sec.label} icon={sec.icon}>
           <div className="list">
@@ -48,9 +38,6 @@ export default function Guide({ open }) {
                     </span>
                   )}
                 </span>
-                {it.foods.length > 0 && (
-                  <button className="icon-btn sm" onClick={() => addToShop(it)} aria-label="Læg på indkøbslisten"><Icon name="plus" size={18} /></button>
-                )}
               </div>
             ))}
           </div>
@@ -61,7 +48,6 @@ export default function Guide({ open }) {
         Indholdet er samlet fra offentligt tilgængelige råd om lavhistamin-kost og er ment som hjælp til et kostforsøg – ikke som
         medicinsk rådgivning. Tal med din læge, hvis du er i tvivl.
       </p>
-      {toast}
     </div>
   );
 }

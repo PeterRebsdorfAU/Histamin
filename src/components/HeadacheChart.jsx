@@ -39,9 +39,8 @@ export default function HeadacheChart({ days, total, half, baselineIntensity }) 
             ) : (
               <rect x={x} y={y(v)} width={w} height={H - padB - y(v)} rx={Math.min(4, w / 3)} fill={headColor(v)} />
             )}
-            {d.log?.period && <circle cx={x + w / 2} cy={H - padB + 15} r={2.5} fill="var(--period)" />}
-            {(d.log?.onPlan === 'nej' || d.log?.onPlan === 'delvist') && (
-              <text x={x + w / 2} y={10} textAnchor="middle" className="mark-text">!</text>
+            {d.histamine && d.histamine !== 'lav' && (
+              <text x={x + w / 2} y={10} textAnchor="middle" className={`mark-text ${d.histamine === 'høj' ? 'high' : ''}`}>!</text>
             )}
             {(i % 2 === 0 || n <= 14) && (
               <text x={x + w / 2} y={H - padB + 11} textAnchor="middle" className="axis-text">{fromKey(d.date).getDate()}</text>

@@ -1,7 +1,6 @@
-// Beregninger til "Fremskridt": hovedpine over tid, uge 1 vs. uge 2,
-// og simple mønstre (ikke statistik – bare observationer).
+// Beregninger til "Fremskridt": hovedpine over tid, første vs. anden halvdel,
+// og sammenhæng mellem histamin i maden (fra Mad-tjek) og hovedpine.
 
-import { SYMPTOMS } from '../data/guide.js';
 import { FOOD_BY_ID } from '../data/foods.js';
 import { get, getSettings } from './db.js';
 import { addDays, range, today, diffDays } from './dates.js';
@@ -13,18 +12,14 @@ export const headacheOf = (log) => {
   return vals.length ? Math.max(...vals) : null;
 };
 
-// Er dagen "udfyldt"? (har man taget stilling til hovedpine)
+// Har man taget stilling til hovedpine den dag?
 export const isLogged = (log) => !!log && (Number.isFinite(log.headache) || (log.episodes || []).length > 0);
-
-// Er hele dagbogen udfyldt? (hovedpine + kost + søvn)
-export const dayComplete = (log) => isLogged(log) && !!log.onPlan && log.sleepHours != null;
 
 export function trialInfo() {
   const s = getSettings();
   if (!s.startDate) return { started: false, dates: [], dayNo: 0, total: s.days };
   const dates = range(s.startDate, s.days);
-  const t = today();
-  const dayNo = diffDays(s.startDate, t) + 1;
+  const dayNo = diffDays(s.startDate, today()) + 1;
   return {
     started: dayNo >= 1,
     finished: dayNo > s.days,
@@ -42,7 +37,7 @@ export function computeInsights() {
   const t = today();
   const days = info.dates.filter((d) => d <= t).map((d, idx) => {
     const log = get('logs', d);
-    return { date: d, idx, log, logged: isLogged(log), h: headacheOf(log) };
+    return { date: d, idx, log, logged: isLogged(log), h: headacheOf(log), histamine: log?.histamine || null };
   });
   const logged = days.filter((d) => d.logged);
 
@@ -53,73 +48,46 @@ export function computeInsights() {
       headacheDays: hd.length,
       avgIntensity: hd.length ? hd.reduce((a, d) => a + d.h, 0) / hd.length : 0,
       meds: arr.reduce((a, d) => a + (Number(d.log?.meds) || 0), 0),
-      wellbeing: avg(arr.map((d) => d.log?.wellbeing).filter(Boolean)),
     };
   };
 
   const half = Math.ceil(s.days / 2);
-  const first = logged.filter((d) => d.idx < half);
-  const second = logged.filter((d) => d.idx >= half);
-
-  const onPlanDays = logged.filter((d) => d.log.onPlan === 'ja').length;
-  const planAnswered = logged.filter((d) => d.log.onPlan).length;
-
-  // Symptomer: antal dage med hvert symptom
-  const symptomCounts = SYMPTOMS.map((sym) => ({
-    ...sym,
-    days: logged.filter((d) => (d.log.symptoms?.[sym.id] || 0) > 0).length,
-    byDay: days.map((d) => d.log?.symptoms?.[sym.id] || 0),
-  }));
+  const withFood = logged.filter((d) => d.histamine);
 
   return {
     info,
     days,
     logged,
     all: stats(logged),
-    first: stats(first),
-    second: stats(second),
+    first: stats(logged.filter((d) => d.idx < half)),
+    second: stats(logged.filter((d) => d.idx >= half)),
     half,
-    adherence: planAnswered ? onPlanDays / planAnswered : null,
-    symptomCounts,
+    lowFoodShare: withFood.length ? withFood.filter((d) => d.histamine === 'lav').length / withFood.length : null,
+    foodDays: withFood.length,
     patterns: findPatterns(logged),
     baseline: s.baselineDays != null ? { days: s.baselineDays, intensity: s.baselineIntensity } : null,
   };
 }
 
-const avg = (arr) => (arr.length ? arr.reduce((a, b) => a + b, 0) / arr.length : null);
-
-// Sammenlign hovedpine på dage MED en faktor vs. dage UDEN.
-// For mad ser vi på samme dag og dagen efter (histamin-reaktioner kan komme forsinket).
+// Histamin-reaktioner kan komme forsinket – derfor ser vi på samme dag og dagen efter.
 function findPatterns(logged) {
   const byDate = Object.fromEntries(logged.map((d) => [d.date, d]));
-  const hasHeadacheSameOrNext = (d) => d.h > 0 || (byDate[addDays(d.date, 1)]?.h || 0) > 0;
-  const out = [];
+  const hit = (d) => d.h > 0 || (byDate[addDays(d.date, 1)]?.h || 0) > 0;
 
-  const compare = (label, pred, { lagged = false, hint } = {}) => {
-    const withF = logged.filter(pred);
-    const without = logged.filter((d) => !pred(d));
-    if (withF.length < 1 || without.length < 1) return;
-    const hit = (d) => (lagged ? hasHeadacheSameOrNext(d) : d.h > 0);
-    const a = withF.filter(hit).length / withF.length;
-    const b = without.filter(hit).length / without.length;
-    out.push({ label, withN: withF.length, withRate: a, withoutN: without.length, withoutRate: b, diff: a - b, lagged, hint });
-  };
+  const high = logged.filter((d) => d.histamine === 'middel' || d.histamine === 'høj');
+  const low = logged.filter((d) => d.histamine === 'lav');
+  const histamine = high.length && low.length
+    ? { withN: high.length, withRate: high.filter(hit).length / high.length, withoutN: low.length, withoutRate: low.filter(hit).length / low.length }
+    : null;
 
-  compare('Dage hvor kosten blev brudt', (d) => d.log.onPlan === 'delvist' || d.log.onPlan === 'nej', { lagged: true, hint: 'Hovedpine samme dag eller dagen efter.' });
-  compare('Under 6½ times søvn', (d) => d.log.sleepHours != null && d.log.sleepHours < 6.5);
-  compare('Høj stress (4–5)', (d) => (d.log.stress || 0) >= 4);
-  compare('Under 6 glas vand', (d) => d.log.water != null && d.log.water < 6);
-  compare('Menstruation', (d) => !!d.log.period);
-  compare('Mere kaffe end normalt (3+ kopper)', (d) => (d.log.coffee || 0) >= 3);
+  const count = {};
+  for (const d of logged) for (const f of d.log.offPlanFoods || []) (count[f] ||= []).push(d);
+  const foods = Object.entries(count)
+    .map(([f, ds]) => ({ food: FOOD_BY_ID[f], foodId: f, times: ds.length, followed: ds.filter(hit).length }))
+    .filter((x) => x.food)
+    .sort((a, b) => b.followed / b.times - a.followed / a.times || b.times - a.times);
 
-  // Specifikke fødevarer, der er spist uden for planen
-  const foodCount = {};
-  for (const d of logged) for (const f of d.log.offPlanFoods || []) (foodCount[f] ||= []).push(d);
-  const foods = Object.entries(foodCount).map(([f, ds]) => ({
-    food: FOOD_BY_ID[f], foodId: f, times: ds.length, followed: ds.filter(hasHeadacheSameOrNext).length,
-  })).filter((x) => x.food).sort((a, b) => b.followed / b.times - a.followed / a.times);
-
-  return { factors: out.sort((a, b) => b.diff - a.diff), foods };
+  return { histamine, foods };
 }
 
 export const pct = (x) => `${Math.round(x * 100)} %`;

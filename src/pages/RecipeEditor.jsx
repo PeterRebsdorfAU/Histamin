@@ -98,7 +98,7 @@ export default function RecipeEditor({ id }) {
           </div>
         ))}
         <FoodInput value={newIng} onChange={setNewIng} onPick={addIng} onEnter={() => addIng(null)} placeholder="Tilføj ingrediens – fx kylling" />
-        <p className="muted small">Vælg fra listen for at få histamin-tjek og samlet indkøbsliste. Tryk Enter for fri tekst.</p>
+        <p className="muted small">Vælg fra listen for at få histamin-tjek. Tryk Enter for fri tekst.</p>
       </Card>
 
       <Card title="Fremgangsmåde" icon="👩‍🍳">

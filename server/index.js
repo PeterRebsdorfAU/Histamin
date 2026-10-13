@@ -3,23 +3,24 @@ import path from 'node:path';
 import fs from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { createStore } from './store.js';
+import { aiEnabled, analyzeMeal, rateLimited } from './ai.js';
 
 const PORT = process.env.PORT || Number(process.argv[2]) || 3001;
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const DIST = path.join(ROOT, 'dist');
 const COLLECTIONS = new Set([
-  'settings', 'plan', 'logs', 'shopManual', 'shopChecks', 'customRecipes',
-  'foodNotes', 'recipeNotes', 'freezer', 'tests',
+  'settings', 'plan', 'logs', 'customRecipes', 'foodNotes', 'recipeNotes', 'freezer', 'tests',
 ]);
 const SPACE_RE = /^[a-z0-9-]{12,64}$/;
 
 const store = await createStore();
 const app = express();
 app.disable('x-powered-by');
+app.set('trust proxy', 1); // Render ligger bag en proxy – giver rigtig klient-IP til rate limit
 app.use(express.json({ limit: '2mb' }));
 
 app.get('/api/health', (_req, res) => {
-  res.json({ ok: true, storage: store.kind });
+  res.json({ ok: true, storage: store.kind, ai: aiEnabled() });
 });
 
 app.post('/api/sync/:space', async (req, res) => {
@@ -39,6 +40,21 @@ app.post('/api/sync/:space', async (req, res) => {
   } catch (err) {
     console.error('Sync-fejl:', err);
     res.status(500).json({ error: 'Serverfejl under synkronisering' });
+  }
+});
+
+// AI-tjek af hvad man har spist
+app.post('/api/ai/meal', async (req, res) => {
+  if (!aiEnabled()) return res.status(503).json({ error: 'AI er ikke slået til på serveren' });
+  const text = typeof req.body?.text === 'string' ? req.body.text.trim() : '';
+  if (!text) return res.status(400).json({ error: 'Skriv hvad du har spist' });
+  if (text.length > 2000) return res.status(413).json({ error: 'Teksten er for lang' });
+  if (rateLimited(req.ip)) return res.status(429).json({ error: 'For mange forespørgsler – prøv igen om lidt' });
+  try {
+    res.json(await analyzeMeal(text));
+  } catch (err) {
+    console.error('AI-fejl:', err.message);
+    res.status(502).json({ error: 'AI-tjekket fejlede – prøv igen' });
   }
 });
 

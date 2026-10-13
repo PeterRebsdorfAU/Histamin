@@ -12,9 +12,7 @@ import FoodDetail from './pages/FoodDetail.jsx';
 import Plan from './pages/Plan.jsx';
 import RecipeDetail from './pages/RecipeDetail.jsx';
 import RecipeEditor from './pages/RecipeEditor.jsx';
-import Shop from './pages/Shop.jsx';
-import LogList from './pages/LogList.jsx';
-import LogDay from './pages/LogDay.jsx';
+import MealCheck from './pages/MealCheck.jsx';
 import Insights from './pages/Insights.jsx';
 import Report from './pages/Report.jsx';
 import Guide from './pages/Guide.jsx';
@@ -24,10 +22,9 @@ import Settings from './pages/Settings.jsx';
 
 const TABS = [
   { id: 'idag', label: 'I dag', icon: 'home', match: ['', 'idag'] },
+  { id: 'spist', label: 'Mad-tjek', icon: 'bolt', match: ['spist'] },
   { id: 'mad', label: 'Fødevarer', icon: 'search', match: ['mad'] },
   { id: 'plan', label: 'Madplan', icon: 'calendar', match: ['plan', 'opskrift', 'opskrift-ny', 'opskrift-ret'] },
-  { id: 'indkob', label: 'Indkøb', icon: 'cart', match: ['indkob'] },
-  { id: 'dagbog', label: 'Dagbog', icon: 'book', match: ['dagbog'] },
 ];
 
 export default function App() {
@@ -64,8 +61,7 @@ export default function App() {
     case 'opskrift': page = <RecipeDetail id={p1} planDate={query.get('dato')} />; break;
     case 'opskrift-ny': page = <RecipeEditor />; break;
     case 'opskrift-ret': page = <RecipeEditor id={p1} />; break;
-    case 'indkob': page = <Shop />; break;
-    case 'dagbog': page = p1 ? <LogDay date={p1} /> : <LogList />; break;
+    case 'spist': page = <MealCheck date={query.get('dato')} />; break;
     case 'fremskridt': page = <Insights />; break;
     case 'rapport': page = <Report />; break;
     case 'viden': page = <Guide open={p1} />; break;

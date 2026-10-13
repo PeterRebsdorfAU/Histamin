@@ -1,14 +1,11 @@
 import { computeInsights, one, pct } from '../lib/insights.js';
 import { getSettings, all } from '../lib/db.js';
+import { checksOf, LEVELS } from '../lib/meal.js';
 import { fmt, today } from '../lib/dates.js';
-import { SYMPTOMS } from '../data/guide.js';
 import { FOOD_BY_ID } from '../data/foods.js';
 import { PageHeader } from '../components/ui.jsx';
 import HeadacheChart from '../components/HeadacheChart.jsx';
 import Icon from '../components/Icon.jsx';
-
-const SEV = ['', 'let', 'mod.', 'kraftig'];
-const PLAN = { ja: 'Ja', delvist: 'Delvist', nej: 'Nej' };
 
 export default function Report() {
   const s = getSettings();
@@ -32,12 +29,12 @@ export default function Report() {
 
       <h2>Resumé</h2>
       <ul>
-        <li>Udfyldte dage: {st.n}</li>
+        <li>Dage med noteret hovedpine-status: {st.n}</li>
         <li>Dage med hovedpine: {st.headacheDays} af {st.n}{baseline ? ` (før forsøget: ca. ${baseline.days} af 14)` : ''}</li>
         <li>Gennemsnitlig styrke på hovedpinedage: {one(st.avgIntensity)} / 10{baseline?.intensity != null ? ` (før: ${baseline.intensity})` : ''}</li>
         <li>Første halvdel: {first.headacheDays} af {first.n} dage · Anden halvdel: {second.headacheDays} af {second.n} dage</li>
         <li>Smertestillende i alt: {st.meds}</li>
-        <li>Dage helt på kosten: {ins.adherence == null ? '–' : pct(ins.adherence)}</li>
+        <li>Dage med lavt histamin i maden: {ins.lowFoodShare == null ? '–' : `${pct(ins.lowFoodShare)} af ${ins.foodDays} tjekkede dage`}</li>
       </ul>
 
       <HeadacheChart days={ins.days} total={info.total} half={ins.half} baselineIntensity={baseline?.intensity} />
@@ -46,26 +43,20 @@ export default function Report() {
       <div className="table-wrap">
         <table className="report-table">
           <thead>
-            <tr>
-              <th>Dato</th><th>Hovedpine</th><th>Medicin</th><th>Symptomer</th><th>Søvn</th><th>Stress</th><th>Vand</th><th>Mens.</th><th>På kost</th><th>Noter</th>
-            </tr>
+            <tr><th>Dato</th><th>Hovedpine</th><th>Medicin</th><th>Histamin i maden</th><th>Spist</th><th>Note</th></tr>
           </thead>
           <tbody>
             {ins.days.map((d) => {
               const l = d.log || {};
-              const sy = SYMPTOMS.filter((x) => l.symptoms?.[x.id]).map((x) => `${x.label} (${SEV[l.symptoms[x.id]]})`);
-              const off = [...(l.offPlanFoods || []).map((f) => FOOD_BY_ID[f]?.name), l.offPlan].filter(Boolean).join(', ');
+              const eaten = checksOf(l).map((c) => c.text).join(' · ');
+              const bad = (l.offPlanFoods || []).map((f) => FOOD_BY_ID[f]?.name).filter(Boolean).join(', ');
               return (
                 <tr key={d.date}>
                   <td>{fmt(d.date, { weekday: false })}</td>
                   <td>{d.logged ? d.h : '–'}{(l.episodes || []).length ? ` (${l.episodes.map((e) => `kl. ${e.time}: ${e.intensity}`).join('; ')})` : ''}</td>
-                  <td>{l.meds ? `${l.meds}${l.medsName ? ` ${l.medsName}` : ''}` : ''}</td>
-                  <td>{sy.join(', ')}</td>
-                  <td>{l.sleepHours != null ? `${String(l.sleepHours).replace('.', ',')} t` : ''}</td>
-                  <td>{l.stress ?? ''}</td>
-                  <td>{l.water ?? ''}</td>
-                  <td>{l.period ? '●' : ''}</td>
-                  <td>{PLAN[l.onPlan] || ''}{off ? `: ${off}` : ''}</td>
+                  <td>{l.meds || ''}</td>
+                  <td>{l.histamine ? LEVELS[l.histamine].short : ''}{bad ? `: ${bad}` : ''}</td>
+                  <td>{eaten}</td>
                   <td>{l.note || ''}</td>
                 </tr>
               );
@@ -89,7 +80,8 @@ export default function Report() {
 
       <p className="muted small">
         Kost: lavhistamin-eliminationsdiæt (vejledende vurderinger inspireret af SIGHI-listen). Hovedpine er selvrapporteret på en skala 0–10.
-        Rapporten er genereret af et privat hjælpeværktøj og er ikke en medicinsk vurdering.
+        Histamin-niveauet for maden er en automatisk vurdering ud fra det, der er skrevet ind. Rapporten er genereret af et privat
+        hjælpeværktøj og er ikke en medicinsk vurdering.
       </p>
     </div>
   );

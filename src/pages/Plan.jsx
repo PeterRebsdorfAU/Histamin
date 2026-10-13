@@ -60,9 +60,6 @@ function PlanView() {
         <button className="btn ghost sm" onClick={() => setConfirmNew(true)}>
           <Icon name="shuffle" size={16} /> Ny plan fra i dag
         </button>
-        <button className="btn ghost sm" onClick={() => go('/indkob')}>
-          <Icon name="cart" size={16} /> Indkøbsliste
-        </button>
       </div>
 
       <div className="plan-list">

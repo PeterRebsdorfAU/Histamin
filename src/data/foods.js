@@ -48,19 +48,6 @@ export const CATEGORIES = [
   { id: 'andet', label: 'Færdigmad & andet', icon: '🥡' },
 ];
 
-// Butiksafdeling til indkøbslisten
-export const SHOP_SECTIONS = [
-  { id: 'gront', label: 'Frugt & grønt' },
-  { id: 'kod', label: 'Kød & fisk (frisk)' },
-  { id: 'frost', label: 'Frost' },
-  { id: 'mejeri', label: 'Mejeri & æg' },
-  { id: 'brod', label: 'Brød' },
-  { id: 'kolonial', label: 'Kolonial' },
-  { id: 'krydderi', label: 'Krydderier & urter' },
-  { id: 'drikke', label: 'Drikkevarer' },
-  { id: 'andet', label: 'Andet' },
-];
-
 const CAT_TO_SHOP = {
   kod: 'kod', fisk: 'kod', mejeri: 'mejeri', gront: 'gront', frugt: 'gront', korn: 'kolonial',
   baelg: 'kolonial', nodder: 'kolonial', krydderi: 'krydderi', sauce: 'kolonial', sod: 'kolonial',

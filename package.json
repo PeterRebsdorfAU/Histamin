@@ -2,7 +2,7 @@
   "name": "histamin-app",
   "version": "1.0.0",
   "private": true,
-  "description": "Lavhistamin-forsøg: fødevareliste, madplan, indkøb og symptomdagbog",
+  "description": "Lavhistamin-forsøg: fødevareliste, madplan, AI-tjek af maden og hovedpine-log",
   "type": "module",
   "engines": {
     "node": ">=20"

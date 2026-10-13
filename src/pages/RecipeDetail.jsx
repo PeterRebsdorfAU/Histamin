@@ -3,7 +3,7 @@ import { FOOD_BY_ID } from '../data/foods.js';
 import { PROTEINS } from '../data/recipes.js';
 import { get, put, remove, getSettings } from '../lib/db.js';
 import { getRecipe, recipeRating, recipeWarnings, recipeOpinion, foodStatus } from '../lib/recipes.js';
-import { fmtQty } from '../lib/shopping.js';
+import { fmtQty } from '../lib/format.js';
 import { today, addDays, fmt, cap, range } from '../lib/dates.js';
 import { trialInfo } from '../lib/insights.js';
 import { go, back } from '../lib/router.js';

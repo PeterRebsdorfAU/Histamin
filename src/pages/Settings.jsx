@@ -22,7 +22,7 @@ export default function Settings() {
   const link = meta.space ? `${location.origin}/#/join/${meta.space}` : '';
 
   const share = async () => {
-    const text = `Tilslut vores lavhistamin-app, så vi deler madplan, indkøbsliste og dagbog:\n${link}`;
+    const text = `Tilslut vores lavhistamin-app, så vi deler madplan, hovedpine og mad-tjek:\n${link}`;
     try {
       if (navigator.share) await navigator.share({ title: 'Lavhistamin-app', text, url: link });
       else { await navigator.clipboard.writeText(link); showToast('Linket er kopieret'); }
@@ -58,7 +58,7 @@ export default function Settings() {
         {!meta.space ? (
           <>
             <p className="small">
-              Del madplan, indkøbsliste, fryser og dagbog mellem jeres telefoner. Data gemmes stadig lokalt på hver telefon, så
+              Del madplan, fryser, hovedpine og mad-tjek mellem jeres telefoner. Data gemmes stadig lokalt på hver telefon, så
               appen virker også uden net.
             </p>
             <button className="btn primary block" onClick={() => { joinSpace(generateSpace(), { create: true }); }}>
@@ -106,6 +106,18 @@ export default function Settings() {
         <Stepper value={s.baselineDays} onChange={(v) => setSettings({ baselineDays: v })} min={0} max={14} start={5} unit="dage" />
         <label className="field-label">Typisk styrke før forsøget (0–10)</label>
         <Stepper value={s.baselineIntensity} onChange={(v) => setSettings({ baselineIntensity: v })} min={0} max={10} start={5} />
+      </Card>
+
+      <Card title="AI mad-tjek" icon="⚡">
+        {health?.ai ? (
+          <p className="small">✅ Slået til. Mad-tjek bruger Google Gemini til at vurdere, hvad du har spist.</p>
+        ) : (
+          <p className="small">
+            {health ? '⏸ Ikke slået til på serveren. ' : 'Ukendt (serveren svarer ikke lige nu). '}
+            Indtil da laver Mad-tjek et simpelt opslag i fødevarelisten. AI slås til ved at sætte miljøvariablen
+            <code> GEMINI_API_KEY</code> på Render (samme type nøgle som i IndkøbsApp).
+          </p>
+        )}
       </Card>
 
       <Card title="Udseende" icon="🎨">

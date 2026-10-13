@@ -1,6 +1,6 @@
 // Lavhistamin-aftensmad. Alle opskrifter er til 2 personer og skaleres i appen.
 // Ingredienser peger på fødevarelisten (f), så appen kan tjekke histamin-status
-// og samle indkøbslisten. "opt" = valgfri ingrediens (kommer ikke på indkøbslisten).
+// og advare om ingredienser. "opt" = valgfri ingrediens (tæller ikke med i vurderingen).
 //
 // Gennemgående principper: ingen tomat, ingen lagret ost, ingen vin/eddike,
 // ingen bouillonterninger eller sojasauce – smag kommer fra friske urter,

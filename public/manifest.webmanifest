@@ -1,7 +1,7 @@
 {
   "name": "Lavhistamin – 14 dage",
   "short_name": "Lavhistamin",
-  "description": "Fødevareliste, madplan, indkøb og symptomdagbog til et lavhistamin-forsøg.",
+  "description": "Fødevareliste, madplan, AI-tjek af maden og hovedpine-log til et lavhistamin-forsøg.",
   "lang": "da",
   "start_url": "/",
   "scope": "/",

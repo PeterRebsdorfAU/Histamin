@@ -232,6 +232,7 @@ textarea.input { resize: vertical; min-height: 64px; }
   padding: 7px 12px; font-size: 0.88rem; font-weight: 500;
 }
 .chip.sm { padding: 5px 10px; font-size: 0.82rem; }
+.chip.wrap { white-space: normal; text-align: left; }
 .chip.on { background: var(--accent); border-color: var(--accent); color: var(--accent-text); }
 
 .segmented { display: flex; background: var(--surface-2); border-radius: 12px; padding: 3px; gap: 3px; }
@@ -513,27 +514,27 @@ textarea.input { resize: vertical; min-height: 64px; }
 .manual-row .check { flex: 1; border-bottom: 0; }
 .shop-section > .row { margin-top: 8px; }
 
-/* ---------- Dagbog ---------- */
-.day-nav { display: flex; align-items: center; gap: 8px; margin-top: 4px; }
-.symptom-row { display: flex; flex-direction: column; gap: 6px; padding: 8px 0; border-bottom: 1px solid var(--border); }
-.symptom-row:last-child { border-bottom: 0; }
-.symptom-label { font-weight: 500; font-size: 0.92rem; }
-.offplan { display: flex; flex-direction: column; gap: 8px; }
-.meals summary { cursor: pointer; font-weight: 600; font-size: 0.9rem; color: var(--accent); margin-top: 6px; }
-.save-state { text-align: center; font-size: 0.85rem; color: var(--muted); padding: 8px; }
-.save-state.ok { color: var(--accent); font-weight: 700; }
-
-.log-strip { display: flex; gap: 3px; align-items: flex-end; height: 96px; background: var(--surface); border-radius: 14px; padding: 10px 10px 4px; border: 1px solid var(--border); }
-.strip-day { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; gap: 4px; height: 100%; background: none; border: 0; padding: 0; }
-.strip-bar { width: 100%; max-width: 22px; border-radius: 5px; background: var(--c); }
-.strip-day.future .strip-bar { background: var(--surface-2); }
-.strip-label { font-size: 0.68rem; color: var(--muted); font-weight: 600; }
-.strip-day.today .strip-label { color: var(--accent); font-weight: 800; }
-.log-row .grow > span:first-child { font-weight: 500; }
-.log-date { width: 40px; display: flex; flex-direction: column; align-items: center; line-height: 1.1; flex-shrink: 0; }
-.log-date span { font-size: 0.7rem; text-transform: uppercase; color: var(--muted); font-weight: 700; }
-.log-date b { font-size: 1.2rem; }
+/* ---------- Hovedpine-uge & Mad-tjek ---------- */
 .h-pill { min-width: 34px; height: 34px; border-radius: 10px; display: grid; place-items: center; font-weight: 800; background: color-mix(in srgb, var(--c) 22%, var(--surface)); border: 2px solid var(--c); }
+.week-strip { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; margin-top: 14px; }
+.week-day { display: flex; flex-direction: column; align-items: center; gap: 4px; background: none; border: 0; padding: 4px 0; border-radius: 10px; }
+.week-day:active { background: var(--surface-2); }
+.week-day .h-pill { min-width: 0; width: 100%; max-width: 40px; height: 32px; font-size: 0.9rem; }
+.week-wd { font-size: 0.68rem; text-transform: uppercase; color: var(--muted); font-weight: 700; }
+.week-date { font-size: 0.7rem; color: var(--muted); }
+.week-day.today .week-wd, .week-day.today .week-date { color: var(--accent); font-weight: 800; }
+.week-food { height: 10px; display: flex; align-items: center; }
+.dot-empty { width: 10px; height: 10px; border-radius: 50%; border: 1.5px dashed var(--border); }
+
+.seg-date { flex: 1; min-width: 0; border: 0; border-radius: 9px; background: transparent; color: var(--muted); font: inherit; font-size: 0.85rem; font-weight: 600; padding: 6px; text-align: center; }
+.seg-date:focus { outline: 2px solid var(--accent); }
+.spinner.sm { width: 16px; height: 16px; border-width: 2px; border-color: rgba(255,255,255,0.4); border-top-color: #fff; }
+.check-head { display: flex; align-items: center; justify-content: space-between; }
+.check-text { font-style: italic; color: var(--muted); margin: 0; }
+.meal-items { list-style: none; padding: 0; margin: 0; }
+.meal-items li { display: flex; align-items: center; gap: 10px; padding: 8px 0; border-bottom: 1px solid var(--border); }
+.meal-items li:last-child { border-bottom: 0; }
+.meal-items .grow { display: block; }
 
 /* ---------- Insights ---------- */
 .chart { width: 100%; height: auto; display: block; }
@@ -542,6 +543,8 @@ textarea.input { resize: vertical; min-height: 64px; }
 .base-line { stroke: var(--info); stroke-dasharray: 5 4; stroke-width: 1.5; }
 .axis-text { font-size: 9px; fill: var(--muted); }
 .mark-text { font-size: 10px; font-weight: 800; fill: var(--r2); }
+.mark-text.high { fill: var(--r3); }
+.mark-legend { color: var(--r2); }
 .chart-legend { display: flex; flex-wrap: wrap; gap: 10px; }
 .chart-legend span { display: inline-flex; align-items: center; gap: 4px; }
 .lg-dot { display: inline-block; width: 9px; height: 9px; border-radius: 50%; }

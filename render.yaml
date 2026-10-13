@@ -23,6 +23,12 @@ services:
         fromDatabase:
           name: lavhistamin-db
           property: connectionString
+      # AI mad-tjek (Google Gemini). Hemmelig – indtastes i Render-dashboardet.
+      # Uden nøgle virker appen stadig, men Mad-tjek laver kun et simpelt opslag.
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: GEMINI_MODEL
+        value: gemini-flash-latest
 
 databases:
   - name: lavhistamin-db

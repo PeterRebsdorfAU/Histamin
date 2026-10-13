@@ -54,7 +54,7 @@ export const isValidSpace = (s) => /^[a-z0-9-]{12,64}$/.test(s || '');
 
 // create=true: ny delingskode – alt lokalt sendes op.
 // create=false: tilslut en eksisterende – partnerens indstillinger (startdato m.m.)
-// bevares, men lokale dagbogsnoter, indkøb osv. flettes ind.
+// bevares, men lokale noter, mad-tjek osv. flettes ind.
 export function joinSpace(space, { create = false } = {}) {
   setMeta({ space, cursor: 0, syncError: null, outbox: {} });
   markAllDirty(create ? [] : ['settings']);

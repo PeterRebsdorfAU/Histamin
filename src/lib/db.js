@@ -2,7 +2,7 @@
 //
 // Alt gemmes i localStorage og virker uden net. Hvis enheden er koblet til et
 // "delt rum" (space), synkroniseres ændringer med serveren, så I begge ser den
-// samme madplan, indkøbsliste og dagbog.
+// samme madplan, hovedpine og mad-tjek.
 //
 // Hver post har { id, updatedAt, deleted? }. Ved konflikt vinder den nyeste.
 
@@ -12,7 +12,7 @@ const DB_KEY = 'histamin.db.v1';
 const META_KEY = 'histamin.meta.v1';
 
 export const COLLECTIONS = [
-  'settings', 'plan', 'logs', 'shopManual', 'shopChecks', 'customRecipes',
+  'settings', 'plan', 'logs', 'customRecipes',
   'foodNotes', 'recipeNotes', 'freezer', 'tests',
 ];
 

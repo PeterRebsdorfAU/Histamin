@@ -67,8 +67,8 @@ export default function Onboarding() {
       <ul className="feature-list">
         <li><span>🔍</span> Slå op, om en fødevare er ok</li>
         <li><span>📅</span> Færdig madplan med 27 lavhistamin-retter</li>
-        <li><span>🛒</span> Indkøbsliste, der laver sig selv</li>
-        <li><span>📓</span> Dagbog over hovedpine og symptomer</li>
+        <li><span>⚡</span> Skriv hvad du har spist – AI tjekker histamin</li>
+        <li><span>🧠</span> Notér hovedpine med ét tryk</li>
         <li><span>📈</span> Overblik over, om det virker</li>
         <li><span>👫</span> Del på tværs af jeres telefoner</li>
       </ul>
@@ -146,7 +146,7 @@ export default function Onboarding() {
           <li>Køb fisk på frost – og frys kød, I ikke bruger samme dag.</li>
           <li>Hold kaffeforbruget som normalt (abstinenser giver hovedpine).</li>
           <li>Drop alkohol i de 14 dage.</li>
-          <li>Udfyld dagbogen hver aften – det tager ét minut.</li>
+          <li>Notér hovedpine hver dag – også når der ikke er nogen.</li>
           <li>Rester: spis inden for et døgn, eller frys straks.</li>
         </ul>
       </div>

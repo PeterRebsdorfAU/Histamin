@@ -1,15 +1,16 @@
 import { useState } from 'react';
 import { get, put, getSettings } from '../lib/db.js';
-import { today, addDays, fmt, cap } from '../lib/dates.js';
-import { trialInfo, headacheOf, isLogged, dayComplete } from '../lib/insights.js';
+import { today, addDays, fmt, cap, range, fromKey, weekdayShort } from '../lib/dates.js';
+import { trialInfo, headacheOf, isLogged } from '../lib/insights.js';
 import { getRecipe, thawText, recipeRating } from '../lib/recipes.js';
-import { searchFoods, FOOD_BY_ID } from '../data/foods.js';
-import { DAILY_HABITS, HEADACHE_LABELS } from '../data/guide.js';
+import { LEVELS } from '../lib/meal.js';
+import { searchFoods } from '../data/foods.js';
+import { HEADACHE_LABELS } from '../data/guide.js';
 import { go } from '../lib/router.js';
-import { Card, Rating, Dot, Check, Stepper, ProgressRing, headColor } from '../components/ui.jsx';
+import { Card, Rating, Dot, ProgressRing, headColor } from '../components/ui.jsx';
 import HeadacheSheet from '../components/HeadacheSheet.jsx';
+import DaySheet from '../components/DaySheet.jsx';
 import Icon from '../components/Icon.jsx';
-import { TIPS } from '../data/tips.js';
 
 export default function Today() {
   const s = getSettings();
@@ -18,19 +19,14 @@ export default function Today() {
   const log = get('logs', t) || {};
   const [q, setQ] = useState('');
   const [hOpen, setHOpen] = useState(false);
+  const [editDay, setEditDay] = useState(null);
 
   const tonight = get('plan', t);
   const tonightRecipe = getRecipe(tonight?.recipeId);
-  const tomorrow = get('plan', addDays(t, 1));
-  const tomorrowRecipe = getRecipe(tomorrow?.recipeId);
-  const thaw = thawText(tomorrowRecipe);
-  const freshMeat = tomorrowRecipe?.ingredients?.find((i) => !i.opt && FOOD_BY_ID[i.f]?.cat === 'kod');
-
   const results = q.trim() ? searchFoods(q).slice(0, 6) : [];
   const h = headacheOf(log);
-  const setLog = (patch) => put('logs', t, { ...log, ...patch });
-  const habits = log.habits || {};
-  const tip = TIPS[Math.abs(info.dayNo || new Date().getDate()) % TIPS.length];
+  const level = log.histamine ? LEVELS[log.histamine] : null;
+  const last7 = range(addDays(t, -6), 7);
 
   return (
     <div className="page">
@@ -41,11 +37,6 @@ export default function Today() {
           {!info.started && <h1>Forsøget starter om {info.daysUntil} {info.daysUntil === 1 ? 'dag' : 'dage'}</h1>}
           {info.started && !info.finished && <h1>Dag {info.dayNo} af {info.total}{s.name ? `, ${s.name}` : ''}</h1>}
           {info.finished && <h1>Forsøget er gennemført! 🎉</h1>}
-          <p className="hero-sub">
-            {!info.started && 'Brug tiden på at handle ind og fylde fryseren.'}
-            {info.started && !info.finished && phaseText(info.dayNo, info.total)}
-            {info.finished && 'Se resultatet, og læs om næste skridt.'}
-          </p>
           {info.finished && (
             <div className="row gap">
               <button className="btn primary sm" onClick={() => go('/fremskridt')}>Se resultatet</button>
@@ -75,19 +66,18 @@ export default function Today() {
       </div>
       {q.trim() && (
         <div className="quick-results">
-          {results.length === 0 && <p className="muted small pad">Ingen fødevarer fundet. Prøv et andet ord.</p>}
+          {results.length === 0 && <p className="muted small pad">Ingen fødevarer fundet. Prøv Mad-tjek i stedet.</p>}
           {results.map((f) => (
             <button key={f.id} className="list-row" onClick={() => go(`/mad/${f.id}`)}>
               <span className="grow">{f.name}</span>
               <Rating r={f.r} size="sm" />
             </button>
           ))}
-          {results.length > 0 && <button className="link-btn pad" onClick={() => go(`/mad?q=${encodeURIComponent(q)}`)}>Se alle resultater →</button>}
         </div>
       )}
 
       {/* Hovedpine */}
-      <Card title="Hovedpine i dag" icon="🧠" action={<button className="link-btn" onClick={() => go(`/dagbog/${t}`)}>Dagbog →</button>}>
+      <Card title="Hovedpine i dag" icon="🧠">
         <div className="headache-today">
           <div className="h-score" style={{ '--c': headColor(h) }}>
             <b>{h ?? '–'}</b>
@@ -97,9 +87,13 @@ export default function Today() {
             <button className="btn danger-soft block" onClick={() => setHOpen(true)}>
               <Icon name="bolt" size={18} /> Jeg har hovedpine nu
             </button>
-            {!isLogged(log) && (
-              <button className="btn ghost block" onClick={() => setLog({ headache: 0 })}>
+            {!isLogged(log) ? (
+              <button className="btn ghost block" onClick={() => put('logs', t, { ...log, headache: 0 })}>
                 <Icon name="check" size={18} /> Ingen hovedpine i dag
+              </button>
+            ) : (
+              <button className="btn ghost block" onClick={() => setEditDay(t)}>
+                <Icon name="edit" size={18} /> Ret
               </button>
             )}
           </div>
@@ -114,10 +108,36 @@ export default function Today() {
             ))}
           </ul>
         )}
+
+        <div className="week-strip" aria-label="Seneste 7 dage">
+          {last7.map((d) => {
+            const l = get('logs', d);
+            const hv = isLogged(l) ? headacheOf(l) : null;
+            return (
+              <button key={d} className={`week-day ${d === t ? 'today' : ''}`} onClick={() => setEditDay(d)} title={fmt(d)}>
+                <span className="week-wd">{weekdayShort(d)}</span>
+                <span className="h-pill" style={{ '--c': headColor(hv) }}>{hv ?? '–'}</span>
+                <span className="week-food">{l?.histamine ? <Dot r={LEVELS[l.histamine].r} /> : <span className="dot-empty" />}</span>
+                <span className="week-date">{fromKey(d).getDate()}</span>
+              </button>
+            );
+          })}
+        </div>
+        <p className="muted small">Tryk på en dag for at rette. Prikken under viser maden den dag.</p>
       </Card>
 
+      {/* Mad i dag */}
+      <button className="cta-card" onClick={() => go('/spist')}>
+        <span className="cta-icon">{level ? level.emoji : '🍽️'}</span>
+        <span className="grow">
+          <b>{level ? `Maden i dag: ${level.label.toLowerCase()}` : 'Hvad har du spist i dag?'}</b>
+          <small>{level ? 'Tryk for at se detaljer eller tilføje mere.' : 'Skriv det med dine egne ord – AI vurderer histamin-indholdet.'}</small>
+        </span>
+        <Icon name="right" />
+      </button>
+
       {/* Aftensmad */}
-      <Card title="Aftensmad i aften" icon="🍽️" action={<button className="link-btn" onClick={() => go('/plan')}>Madplan →</button>}>
+      <Card title="Aftensmad i aften" icon="🍲" action={<button className="link-btn" onClick={() => go('/plan')}>Madplan →</button>}>
         {tonightRecipe ? (
           <button className="recipe-hero" onClick={() => go(`/opskrift/${tonightRecipe.id}?dato=${t}`)}>
             <Dot r={recipeRating(tonightRecipe)} />
@@ -127,13 +147,7 @@ export default function Today() {
             </div>
             <Icon name="right" />
           </button>
-        ) : null}
-        {tonightRecipe && thawText(tonightRecipe) && (
-          <p className="muted small">
-            ❄️ Kræver optøet {thawText(tonightRecipe)}. Glemt det? Læg den i en tæt pose i koldt vand i ca. 1 time.
-          </p>
-        )}
-        {tonightRecipe ? null : tonight?.text ? (
+        ) : tonight?.text ? (
           <p><b>{tonight.text}</b></p>
         ) : (
           <div className="row gap">
@@ -141,70 +155,13 @@ export default function Today() {
             <button className="btn sm" onClick={() => go('/plan')}>Vælg ret</button>
           </div>
         )}
+        {tonightRecipe && thawText(tonightRecipe) && (
+          <p className="muted small">❄️ Kræver optøet {thawText(tonightRecipe)}. Glemt det? Læg den i en tæt pose i koldt vand i ca. 1 time.</p>
+        )}
       </Card>
-
-      {/* Forbered til i morgen */}
-      {(thaw || freshMeat || tomorrowRecipe) && (
-        <Card title="Forbered til i morgen" icon="⏰" tone="info">
-          {tomorrowRecipe && <p className="small">I morgen: <b>{tomorrowRecipe.title}</b></p>}
-          {thaw && (
-            <p className="prep-line"><Icon name="snow" size={18} /> Tag <b>{thaw}</b> op af fryseren i aften, og lad det tø op i køleskabet.</p>
-          )}
-          {freshMeat && (
-            <p className="prep-line"><Icon name="cart" size={18} /> Køb <b>{(freshMeat.n || FOOD_BY_ID[freshMeat.f].name).toLowerCase()}</b> i morgen (eller tag frosset op i aften).</p>
-          )}
-          {!thaw && !freshMeat && <p className="muted small">Ingen særlig forberedelse – tjek bare, at I har ingredienserne.</p>}
-        </Card>
-      )}
-
-      {/* Daglige vaner */}
-      {info.started && (
-        <Card title="Dagens gode vaner" icon="✅">
-          <div className="water">
-            <span><Icon name="drop" size={18} /> Vand (glas à 2,5 dl)</span>
-            <Stepper value={log.water ?? 0} onChange={(v) => setLog({ water: v })} min={0} max={20} />
-          </div>
-          <div className="water-bar"><span style={{ width: `${Math.min(100, ((log.water || 0) / 7) * 100)}%` }} /></div>
-          {DAILY_HABITS.filter((x) => x.id !== 'vand').map((hb) => (
-            <Check key={hb.id} checked={habits[hb.id]} onChange={(v) => setLog({ habits: { ...habits, [hb.id]: v } })}>
-              {hb.label}
-            </Check>
-          ))}
-        </Card>
-      )}
-
-      {/* Dagbog-påmindelse */}
-      {info.started && !dayComplete(log) && (
-        <button className="cta-card" onClick={() => go(`/dagbog/${t}`)}>
-          <span className="cta-icon">📓</span>
-          <span className="grow">
-            <b>Udfyld dagens dagbog</b>
-            <small>Søvn, symptomer, mad og stress – tager ca. 1 minut.</small>
-          </span>
-          <Icon name="right" />
-        </button>
-      )}
-
-      {/* Dagens tip */}
-      <Card title="Dagens tip" icon="💡" tone="soft">
-        <p>{tip}</p>
-      </Card>
-
-      <div className="link-grid">
-        <button onClick={() => go('/fremskridt')}><Icon name="chart" /> Fremskridt</button>
-        <button onClick={() => go('/viden')}><Icon name="info" /> Viden & idéer</button>
-        <button onClick={() => go('/plan?v=fryser')}><Icon name="snow" /> Fryseren</button>
-        <button onClick={() => go('/efter')}><Icon name="flag" /> Efter forsøget</button>
-      </div>
 
       <HeadacheSheet open={hOpen} onClose={() => setHOpen(false)} date={t} />
+      <DaySheet date={editDay} onClose={() => setEditDay(null)} />
     </div>
   );
-}
-
-function phaseText(day, total) {
-  if (day <= 2) return 'De første dage handler om at komme godt i gang. Effekten kommer typisk først om nogle dage.';
-  if (day <= 4) return 'Kroppen "tømmer spanden". Hold fast – mange mærker først forskel fra dag 5.';
-  if (day <= total - 3) return 'Godt gået! Nu begynder det at vise sig, om kosten gør en forskel.';
-  return 'Sidste stræk! Bliv ved med at udfylde dagbogen – de sidste dage er vigtige data.';
 }
